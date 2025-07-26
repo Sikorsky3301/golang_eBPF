@@ -1,0 +1,69 @@
+1. How the Highlighted Constructs Work
+cnp := make(chan func(), 10)
+
+Creates a buffered channel that can hold up to 10 function values
+The channel type is chan func() - it transports functions with no parameters and no return values
+Buffered means it can store 10 functions before blocking on send operations
+
+for i := 0; i < 4; i++
+
+Creates exactly 4 worker goroutines
+Each iteration spawns a new concurrent worker
+
+go func() { for f := range cnp { f() } }()
+
+Launches an anonymous goroutine (worker)
+Each worker runs an infinite loop: for f := range cnp
+When a function arrives on the channel, the worker executes it with f()
+The range continues until the channel is closed
+
+2. Use Cases for These Constructs
+Worker Pool Pattern Applications:
+
+Web servers: Handle HTTP requests concurrently
+Image processing: Resize multiple images in parallel
+Database operations: Process multiple queries simultaneously
+File processing: Handle large batches of files
+Task queues: Execute background jobs
+
+Example use case:
+go// Process multiple URLs concurrently
+for _, url := range urls {
+    cnp <- func() {
+        response := fetchURL(url)
+        processResponse(response)
+    }
+}
+3. Significance of the For Loop with 4 Iterations
+
+Concurrency level: Limits parallel execution to 4 workers maximum
+Resource control: Prevents unlimited goroutine creation
+Performance tuning: 4 workers might match CPU cores or optimal throughput
+Load balancing: Distributes work across multiple workers
+
+4. Significance of make(chan func(), 10)
+The buffer size of 10 provides:
+
+Decoupling: Producers can send up to 10 functions without blocking
+Burst handling: Accommodates temporary spikes in work
+Performance: Reduces blocking between producers and consumers
+Flow control: Prevents unlimited memory usage from unbounded queuing
+
+5. Why "HERE1" is NOT Getting Printed
+The main goroutine exits immediately! Here's what happens:
+gocnp <- func() { fmt.Println("HERE1") }  // Function sent to channel
+fmt.Println("Hello")                    // Prints immediately
+// main() exits here!
+Execution flow:
+
+4 worker goroutines start and wait for functions
+Anonymous function containing "HERE1" is sent to buffered channel
+fmt.Println("Hello") executes immediately
+main() exits, terminating the entire program
+Worker goroutines never get a chance to process the function
+
+To fix this, you need to wait:
+go// Add this before main() exits:
+time.Sleep(100 * time.Millisecond)
+// Or use a sync.WaitGroup
+// Or close the channel and wait for workers to finish
